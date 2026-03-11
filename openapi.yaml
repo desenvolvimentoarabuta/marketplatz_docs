@@ -1,0 +1,598 @@
+openapi: 3.0.3
+info:
+  title: Marketplatz API
+  version: 1.0.0
+  description: |
+    Especificação OpenAPI para a API do Marketplatz.
+    Esta documentação reflete o estado atual do backend e sincroniza com os arquivos em `docs/backend/api/`.
+servers:
+  - url: http://[IP_DA_MAQUINA]:8080/api/v1
+    description: Servidor de Desenvolvimento
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+        mobile_phone:
+          type: string
+        photo_profile:
+          type: string
+          nullable: true
+        cpf_cnpj:
+          type: string
+          nullable: true
+        user_type:
+          type: string
+          enum: [cliente, vendedor, admin, operator]
+        address:
+          type: string
+          nullable: true
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        sku:
+          type: string
+        price:
+          type: number
+        final_price:
+          type: number
+        main_image:
+          type: string
+        quantity:
+          type: number
+        unit_label:
+          type: string
+        seller:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        category:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        order_id:
+          type: integer
+        product_id:
+          type: integer
+        product_name:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        unit_price:
+          type: number
+        total_price:
+          type: number
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        total_amount:
+          type: number
+        delivery_status:
+          type: string
+        created_at:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+
+security:
+  - bearerAuth: []
+
+paths:
+  # --- AUTH ---
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registro de novo usuário
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [first_name, email, password]
+              properties:
+                first_name: { type: string }
+                last_name: { type: string }
+                email: { type: string }
+                password: { type: string }
+      responses:
+        '201':
+          description: Criado
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Autenticação via JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: Token retornado
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Retorna usuário logado
+      responses:
+        '200':
+          description: Perfil do usuário
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /auth/logout:
+    get:
+      tags: [Auth]
+      summary: Invalida sessão
+      responses:
+        '200':
+          description: OK
+
+  # --- PRODUCTS ---
+  /products:
+    get:
+      tags: [Products]
+      summary: Listagem de produtos
+      security: []
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: category_id
+          in: query
+          schema: { type: integer }
+        - name: page
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Lista de produtos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  products:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+                  pagination: { type: object }
+  /products/{id}:
+    get:
+      tags: [Products]
+      summary: Detalhes do produto
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Detalhes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  product: { $ref: '#/components/schemas/Product' }
+
+  # --- CART ---
+  /cart:
+    get:
+      tags: [Cart]
+      summary: Ver carrinho
+      responses:
+        '200':
+          description: Itens do carrinho
+    post:
+      tags: [Cart]
+      summary: Adicionar item
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                product_id: { type: integer }
+                quantity: { type: integer }
+      responses:
+        '200':
+          description: OK
+    put:
+      tags: [Cart]
+      summary: Atualizar quantidade
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                product_id: { type: integer }
+                quantity: { type: integer }
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags: [Cart]
+      summary: Remover item ou limpar tudo
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                product_id: { type: integer, nullable: true }
+      responses:
+        '200':
+          description: OK
+
+  # --- FAVORITES ---
+  /favorites:
+    get:
+      tags: [Favorites]
+      summary: Listar favoritos
+      responses:
+        '200':
+          description: Lista
+    post:
+      tags: [Favorites]
+      summary: Adicionar favorito
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                produto_id: { type: integer }
+      responses:
+        '200':
+          description: OK
+  /favorites/{id}:
+    get:
+      tags: [Favorites]
+      summary: Verificar favorito
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+    put:
+      tags: [Favorites]
+      summary: Garantir favorito (Idempotente)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags: [Favorites]
+      summary: Remover favorito
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+
+  # --- ORDERS ---
+  /orders:
+    get:
+      tags: [Orders]
+      summary: Listar pedidos
+      responses:
+        '200':
+          description: Lista de pedidos
+    post:
+      tags: [Orders]
+      summary: Criar pedido
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order:
+                  type: object
+                  properties:
+                    notes: { type: string }
+                    delivery_address: { type: string }
+                    payment_method: { type: string }
+                    items:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          product_id: { type: integer }
+                          quantity: { type: number }
+      responses:
+        '200':
+          description: OK
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Detalhes do pedido
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+    put:
+      tags: [Orders]
+      summary: Atualizar pedido
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags: [Orders]
+      summary: Cancelar pedido
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+      responses:
+        '200':
+          description: OK
+
+  # --- ORDER ITEMS ---
+  /order-items:
+    get:
+      tags: [Order Items]
+      summary: Listar itens por pedido
+      parameters:
+        - name: order_id
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [Order Items]
+      summary: Adicionar item a pedido existente
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order_id: { type: integer }
+                product_id: { type: integer }
+                quantity: { type: number }
+      responses:
+        '201':
+          description: Adicionado
+  /order-items/{id}:
+    get:
+      tags: [Order Items]
+      summary: Ver item específico
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+    put:
+      tags: [Order Items]
+      summary: Atualizar quantidade do item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity: { type: number }
+      responses:
+        '200':
+          description: OK
+    delete:
+      tags: [Order Items]
+      summary: Remover item individual
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+
+  # --- USERS ---
+  /users:
+    get:
+      tags: [User]
+      summary: Ver perfil completo
+      responses:
+        '200':
+          description: OK
+    put:
+      tags: [User]
+      summary: Atualizar dados cadastrais
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name: { type: string }
+                last_name: { type: string }
+                mobile_phone: { type: string }
+                pix_key: { type: string }
+                address: { type: string }
+      responses:
+        '200':
+          description: OK
+  /users/photo:
+    post:
+      tags: [User]
+      summary: Atualizar foto de perfil
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                photo_profile:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: OK
+  /users/password:
+    post:
+      tags: [User]
+      summary: Alterar senha
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password: { type: string }
+                confirm_password: { type: string }
+      responses:
+        '200':
+          description: OK
+
+  # --- COMMONS ---
+  /units:
+    get:
+      tags: [Commons]
+      summary: Unidades de Medida
+      security: []
+      responses:
+        '200':
+          description: OK
+  /status:
+    get:
+      tags: [Commons]
+      summary: Status do Sistema
+      security: []
+      responses:
+        '200':
+          description: OK
+  /payments:
+    get:
+      tags: [Commons]
+      summary: Formas de Pagamento
+      security: []
+      responses:
+        '200':
+          description: OK
+
+  /categories:
+    get:
+      tags: [Categories]
+      summary: Listar categorias
+      security: []
+      responses:
+        '200':
+          description: OK
+  /subcategories:
+    get:
+      tags: [Categories]
+      summary: Listar subcategorias
+      security: []
+      responses:
+        '200':
+          description: OK
+  /promotions:
+    get:
+      tags: [Categories]
+      summary: Listar promoções (banners)
+      security: []
+      responses:
+        '200':
+          description: OK
